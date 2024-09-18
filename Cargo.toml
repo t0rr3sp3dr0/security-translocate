@@ -1,0 +1,25 @@
+[package]
+name = "security-translocate"
+version = "0.1.0"
+authors = [ "Pedro Tôrres <t0rr3sp3dr0@gmail.com>" ]
+edition = "2021"
+description = "Rust Bindings to libsecurity_translocate"
+documentation = "https://docs.rs/security-translocate"
+readme = "README.md"
+homepage = "http://t0rr3sp3dr0.github.io/security-translocate"
+repository = "https://github.com/t0rr3sp3dr0/security-translocate"
+license = "Apache-2.0"
+keywords = [ "framework", "mac", "ios", "security", "translocate" ]
+categories = [ "api-bindings", "os", "os::macos-apis" ]
+publish = [ "crates-io" ]
+
+[package.metadata.docs.rs]
+default-target = "x86_64-apple-darwin"
+targets = [ "aarch64-apple-darwin", "aarch64-apple-ios", "x86_64-apple-darwin", "x86_64-apple-ios" ]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+core-foundation = "0.10.0"
+libc = "0.2.158"
