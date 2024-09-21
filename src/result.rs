@@ -1,29 +1,56 @@
-use core_foundation::base::TCFType;
+use core_foundation::base::{TCFType, TCFTypeRef};
 use core_foundation::error::{CFError, CFErrorRef};
-use core_foundation::url::{CFURLRef, CFURL};
 
-pub(crate) fn from_bool_and_error_to_result(
-    bool_ref: *const bool,
-    error_ref: CFErrorRef,
-) -> Result<bool, CFError> {
-    if !bool_ref.is_null() {
-        let bool = unsafe { bool_ref.read() };
-        Ok(bool)
-    } else {
-        let error = unsafe { TCFType::wrap_under_create_rule(error_ref) };
-        Err(error)
+pub(crate) trait FromOptionsWithBool {
+    fn from_options_with_bool(
+        bool_option: Option<bool>,
+        cf_error_ref_option: Option<CFErrorRef>,
+    ) -> Self;
+}
+
+impl FromOptionsWithBool for Result<bool, CFError> {
+    fn from_options_with_bool(
+        bool_option: Option<bool>,
+        cf_error_ref_option: Option<CFErrorRef>,
+    ) -> Self {
+        match bool_option {
+            Some(bool) => Ok(bool),
+
+            None => {
+                let cf_error_ref = cf_error_ref_option.unwrap();
+                let cf_error = unsafe { CFError::wrap_under_create_rule(cf_error_ref) };
+
+                Err(cf_error)
+            }
+        }
     }
 }
 
-pub(crate) fn from_url_and_error_to_result(
-    url_ref: CFURLRef,
-    error_ref: CFErrorRef,
-) -> Result<CFURL, CFError> {
-    if !url_ref.is_null() {
-        let url = unsafe { TCFType::wrap_under_create_rule(url_ref) };
-        Ok(url)
-    } else {
-        let error = unsafe { TCFType::wrap_under_create_rule(error_ref) };
-        Err(error)
+pub(crate) trait FromOptionsWithCFTypeRef<T: TCFTypeRef> {
+    fn from_options_with_cf_type_ref(
+        cf_type_ref_option: Option<T>,
+        cf_error_ref_option: Option<CFErrorRef>,
+    ) -> Self;
+}
+
+impl<T: TCFType> FromOptionsWithCFTypeRef<T::Ref> for Result<T, CFError> {
+    fn from_options_with_cf_type_ref(
+        cf_type_ref_option: Option<T::Ref>,
+        cf_error_ref_option: Option<CFErrorRef>,
+    ) -> Self {
+        match cf_type_ref_option {
+            Some(cf_type_ref) => {
+                let cf_type = unsafe { T::wrap_under_create_rule(cf_type_ref) };
+
+                Ok(cf_type)
+            }
+
+            None => {
+                let cf_error_ref = cf_error_ref_option.unwrap();
+                let cf_error = unsafe { CFError::wrap_under_create_rule(cf_error_ref) };
+
+                Err(cf_error)
+            }
+        }
     }
 }

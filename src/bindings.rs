@@ -1,6 +1,6 @@
-use crate::option::from_bool_and_error_to_option;
-use crate::result::{from_bool_and_error_to_result, from_url_and_error_to_result};
-use core_foundation::base::TCFType;
+use crate::option::{SomeCFErrorRefUnlessOk, ToOption as _};
+use crate::result::{FromOptionsWithBool, FromOptionsWithCFTypeRef};
+use core_foundation::base::TCFType as _;
 use core_foundation::dictionary::CFDictionary;
 use core_foundation::error::CFError;
 use core_foundation::url::CFURL;
@@ -19,10 +19,11 @@ use std::ptr::{null, null_mut};
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateStartListening.html>
 pub fn start_listening() -> Option<CFError> {
-    let mut error_ref = null_mut();
-    let ok = unsafe { SecTranslocateStartListening(&mut error_ref) };
+    let mut error = null_mut();
+    let ok = unsafe { SecTranslocateStartListening(&mut error) };
 
-    from_bool_and_error_to_option(ok, error_ref)
+    let error = error.to_option();
+    Option::some_cf_error_ref_unless_ok(ok, error)
 }
 
 /// Initializes the SecTranslocate Library as the XPC Server, the Disk Arbitration Listener, and the Launch Services Notification Listener.
@@ -30,12 +31,13 @@ pub fn start_listening() -> Option<CFError> {
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateStartListeningWithOptions.html>
 pub fn start_listening_with_options(options: CFDictionary) -> Option<CFError> {
-    let options_ref = options.as_concrete_TypeRef();
+    let options = options.as_concrete_TypeRef();
 
-    let mut error_ref = null_mut();
-    let ok = unsafe { SecTranslocateStartListeningWithOptions(options_ref, &mut error_ref) };
+    let mut error = null_mut();
+    let ok = unsafe { SecTranslocateStartListeningWithOptions(options, &mut error) };
 
-    from_bool_and_error_to_option(ok, error_ref)
+    let error = error.to_option();
+    Option::some_cf_error_ref_unless_ok(ok, error)
 }
 
 /// Translocates the directory specified by `path_to_translocate`.
@@ -46,23 +48,20 @@ pub fn create_secure_directory_for_url(
     path_to_translocate: CFURL,
     destination_path: Option<CFURL>,
 ) -> Result<CFURL, CFError> {
-    let path_to_translocate_ref = path_to_translocate.as_concrete_TypeRef();
-    let destination_path_ref = match destination_path {
-        Some(url) => url.as_concrete_TypeRef(),
-
+    let path_to_translocate = path_to_translocate.as_concrete_TypeRef();
+    let destination_path = match destination_path {
+        Some(destination_path) => destination_path.as_concrete_TypeRef(),
         None => null(),
     };
 
-    let mut error_ref = null_mut();
-    let url_ref = unsafe {
-        SecTranslocateCreateSecureDirectoryForURL(
-            path_to_translocate_ref,
-            destination_path_ref,
-            &mut error_ref,
-        )
+    let mut error = null_mut();
+    let url = unsafe {
+        SecTranslocateCreateSecureDirectoryForURL(path_to_translocate, destination_path, &mut error)
     };
 
-    from_url_and_error_to_result(url_ref, error_ref)
+    let url = url.to_option();
+    let error = error.to_option();
+    Result::from_options_with_cf_type_ref(url, error)
 }
 
 /// Translocates the directory specified by `path_to_translocate`.
@@ -73,19 +72,16 @@ pub fn create_generic(
     path_to_translocate: CFURL,
     destination_path: CFURL,
 ) -> Result<CFURL, CFError> {
-    let path_to_translocate_ref = path_to_translocate.as_concrete_TypeRef();
-    let destination_path_ref = destination_path.as_concrete_TypeRef();
+    let path_to_translocate = path_to_translocate.as_concrete_TypeRef();
+    let destination_path = destination_path.as_concrete_TypeRef();
 
-    let mut error_ref = null_mut();
-    let url_ref = unsafe {
-        SecTranslocateCreateGeneric(
-            path_to_translocate_ref,
-            destination_path_ref,
-            &mut error_ref,
-        )
-    };
+    let mut error = null_mut();
+    let url =
+        unsafe { SecTranslocateCreateGeneric(path_to_translocate, destination_path, &mut error) };
 
-    from_url_and_error_to_result(url_ref, error_ref)
+    let url = url.to_option();
+    let error = error.to_option();
+    Result::from_options_with_cf_type_ref(url, error)
 }
 
 /// Registers that a translocated pid is running.
@@ -101,16 +97,17 @@ pub fn app_launch_checkin(pid: pid_t) {
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateURLShouldRunTranslocated.html>
 pub fn url_should_run_translocated(path: CFURL) -> Result<bool, CFError> {
-    let path_ref = path.as_concrete_TypeRef();
+    let path = path.as_concrete_TypeRef();
 
     let mut should_translocate = false;
-    let mut error_ref = null_mut();
+    let mut error = null_mut();
     let ok = unsafe {
-        SecTranslocateURLShouldRunTranslocated(path_ref, &mut should_translocate, &mut error_ref)
+        SecTranslocateURLShouldRunTranslocated(path, &mut should_translocate, &mut error)
     };
 
-    let should_translocate_ref = if ok { &should_translocate } else { null() };
-    from_bool_and_error_to_result(should_translocate_ref, error_ref)
+    let should_translocate = if ok { Some(should_translocate) } else { None };
+    let error = error.to_option();
+    Result::from_options_with_bool(should_translocate, error)
 }
 
 /// Indicates if the provided path is a translocated path.
@@ -118,15 +115,15 @@ pub fn url_should_run_translocated(path: CFURL) -> Result<bool, CFError> {
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateIsTranslocatedURL.html>
 pub fn is_translocated_url(path: CFURL) -> Result<bool, CFError> {
-    let path_ref = path.as_concrete_TypeRef();
+    let path = path.as_concrete_TypeRef();
 
     let mut is_translocated = false;
-    let mut error_ref = null_mut();
-    let ok =
-        unsafe { SecTranslocateIsTranslocatedURL(path_ref, &mut is_translocated, &mut error_ref) };
+    let mut error = null_mut();
+    let ok = unsafe { SecTranslocateIsTranslocatedURL(path, &mut is_translocated, &mut error) };
 
-    let is_translocated_ref = if ok { &is_translocated } else { null() };
-    from_bool_and_error_to_result(is_translocated_ref, error_ref)
+    let is_translocated = if ok { Some(is_translocated) } else { None };
+    let error = error.to_option();
+    Result::from_options_with_bool(is_translocated, error)
 }
 
 /// Finds the original path to a file given a translocated path.
@@ -134,13 +131,14 @@ pub fn is_translocated_url(path: CFURL) -> Result<bool, CFError> {
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateCreateOriginalPathForURL.html>
 pub fn create_original_path_for_url(translocated_path: CFURL) -> Result<CFURL, CFError> {
-    let translocated_path_ref = translocated_path.as_concrete_TypeRef();
+    let translocated_path = translocated_path.as_concrete_TypeRef();
 
-    let mut error_ref = null_mut();
-    let url_ref =
-        unsafe { SecTranslocateCreateOriginalPathForURL(translocated_path_ref, &mut error_ref) };
+    let mut error = null_mut();
+    let url = unsafe { SecTranslocateCreateOriginalPathForURL(translocated_path, &mut error) };
 
-    from_url_and_error_to_result(url_ref, error_ref)
+    let url = url.to_option();
+    let error = error.to_option();
+    Result::from_options_with_cf_type_ref(url, error)
 }
 
 /// Unmount the translocated directory structure and delete the mount point directory.
@@ -148,10 +146,11 @@ pub fn create_original_path_for_url(translocated_path: CFURL) -> Result<CFURL, C
 /// # Reference
 /// <https://docs.rs/security-translocate-sys/0.1.1/security_translocate_sys/fn.SecTranslocateDeleteSecureDirectory.html>
 pub fn delete_secure_directory(translocated_path: CFURL) -> Option<CFError> {
-    let translocated_path_ref = translocated_path.as_concrete_TypeRef();
+    let translocated_path = translocated_path.as_concrete_TypeRef();
 
-    let mut error_ref = null_mut();
-    let ok = unsafe { SecTranslocateDeleteSecureDirectory(translocated_path_ref, &mut error_ref) };
+    let mut error = null_mut();
+    let ok = unsafe { SecTranslocateDeleteSecureDirectory(translocated_path, &mut error) };
 
-    from_bool_and_error_to_option(ok, error_ref)
+    let error = error.to_option();
+    Option::some_cf_error_ref_unless_ok(ok, error)
 }
